@@ -3,6 +3,7 @@ package websocket
 import (
 	"log"
 	"sync"
+	"time"
 
 	"zodiac-ai-backend/services/chat-service/models"
 
@@ -155,6 +156,16 @@ func (h *Hub) GetRoomClients(roomID string) int {
 	return 0
 }
 
+// Register registers a client (exported method)
+func (h *Hub) Register(client *Client) {
+	h.register <- client
+}
+
+// Unregister unregisters a client (exported method)
+func (h *Hub) Unregister(client *Client) {
+	h.unregister <- client
+}
+
 // ReadPump reads messages from WebSocket connection
 func (c *Client) ReadPump() {
 	defer func() {
@@ -196,6 +207,6 @@ func (c *Client) WritePump() {
 }
 
 // getCurrentTime returns current timestamp
-func getCurrentTime() string {
-	return ""
+func getCurrentTime() time.Time {
+	return time.Now()
 }

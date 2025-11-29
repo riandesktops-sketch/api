@@ -2,7 +2,6 @@ package services
 
 import (
 	"context"
-	"errors"
 
 	"zodiac-ai-backend/services/social-service/models"
 	"zodiac-ai-backend/services/social-service/repositories"

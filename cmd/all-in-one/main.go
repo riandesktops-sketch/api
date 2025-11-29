@@ -89,8 +89,13 @@ func main() {
 	messageRepo := chatRepos.NewMessageRepository(db)
 	roomRepo := chatRepos.NewRoomRepository(db)
 
-	// AI service URL is internal (same app)
-	chatService := chatServices.NewChatService(sessionRepo, messageRepo, "http://localhost:8080")
+	// AI service URL is internal (same app) - use direct handler call instead of HTTP
+	// For simplicity, we'll keep HTTP but use localhost
+	aiServiceURL := os.Getenv("AI_SERVICE_URL")
+	if aiServiceURL == "" {
+		aiServiceURL = "http://localhost:8080"
+	}
+	chatService := chatServices.NewChatService(sessionRepo, messageRepo, aiServiceURL)
 
 	chatHandler := chatHandlers.NewChatHandler(chatService)
 

@@ -101,7 +101,7 @@ func (h *RoomHandler) JoinRoom(c *ws.Conn) {
 	}
 
 	// Register client
-	h.hub.register <- client
+	h.hub.Register(client)
 
 	// Start read and write pumps
 	go client.WritePump()
