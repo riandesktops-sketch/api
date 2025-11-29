@@ -1,4 +1,3 @@
-# Build stage
 FROM golang:1.21-alpine AS builder
 
 WORKDIR /app
@@ -7,24 +6,27 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy source code
+# Copy all source code
 COPY . .
 
-# Build all-in-one application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main ./cmd/all-in-one
+# Build the all-in-one application
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o app ./cmd/all-in-one
 
-# Runtime stage
+# Use minimal runtime image
 FROM alpine:latest
 
 RUN apk --no-cache add ca-certificates
 
 WORKDIR /root/
 
-# Copy binary from builder
-COPY --from=builder /app/main .
+# Copy the binary from builder
+COPY --from=builder /app/app .
 
 # Expose port
 EXPOSE 8080
 
-# Run
-CMD ["./main"]
+# Set environment variable for port
+ENV PORT=8080
+
+# Run the application
+CMD ["./app"]

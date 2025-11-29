@@ -1,0 +1,86 @@
+# Koyeb Deployment Configuration
+
+## Method 1: Using Dockerfile (Recommended)
+
+### Koyeb Settings:
+- **Builder**: Docker
+- **Dockerfile path**: Dockerfile
+- **Port**: 8080
+
+### Environment Variables:
+```
+MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/zodiac_ai
+MONGODB_DATABASE=zodiac_ai
+JWT_SECRET=your-super-secret-jwt-key-change-this-in-production
+GEMINI_API_KEY=your-gemini-api-key-from-google
+PORT=8080
+```
+
+---
+
+## Method 2: Using Buildpack (Alternative)
+
+### Koyeb Settings:
+- **Builder**: Buildpack (Go)
+- **Build command**: `go build -o app ./cmd/all-in-one`
+- **Run command**: `./app`
+- **Port**: 8080
+
+### Environment Variables:
+Same as Method 1
+
+---
+
+## Troubleshooting
+
+### Error: "cannot find package"
+**Solution**: Make sure `go.mod` and `go.sum` are committed
+```bash
+git add go.mod go.sum
+git commit -m "Add go modules"
+git push
+```
+
+### Error: "no Go files"
+**Solution**: Check build command path
+```
+Build command: go build -o app ./cmd/all-in-one
+NOT: go build -o app .
+```
+
+### Error: "module not found"
+**Solution**: Check module name in go.mod
+```go
+module zodiac-ai-backend  // Must match import paths
+```
+
+---
+
+## Quick Deploy Checklist
+
+- [ ] MongoDB Atlas cluster created
+- [ ] Gemini API key obtained
+- [ ] Code pushed to GitHub
+- [ ] Koyeb account created
+- [ ] Service created with correct builder
+- [ ] Environment variables set
+- [ ] Deploy triggered
+
+---
+
+## After Deployment
+
+1. Check logs in Koyeb dashboard
+2. Test health endpoint: `https://your-app.koyeb.app/health`
+3. Run migrations: `make migrate` (from local with MongoDB URI)
+4. Test API endpoints
+
+---
+
+## Support
+
+If build still fails, check:
+1. Koyeb build logs (detailed error messages)
+2. Go version compatibility (using 1.21+)
+3. All dependencies in go.mod
+4. Correct file paths in build command
