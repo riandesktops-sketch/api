@@ -1,0 +1,80 @@
+services:
+  # API Gateway
+  - type: web
+    name: zodiac-api-gateway
+    env: go
+    buildCommand: go build -o bin/gateway ./api-gateway
+    startCommand: ./bin/gateway
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: AUTH_SERVICE_URL
+        value: https://zodiac-auth-service.onrender.com
+      - key: CHAT_SERVICE_URL
+        value: https://zodiac-chat-service.onrender.com
+      - key: SOCIAL_SERVICE_URL
+        value: https://zodiac-social-service.onrender.com
+      - key: AI_SERVICE_URL
+        value: https://zodiac-ai-service.onrender.com
+      - key: API_GATEWAY_PORT
+        value: 8000
+
+  # Auth Service
+  - type: web
+    name: zodiac-auth-service
+    env: go
+    buildCommand: go build -o bin/auth ./services/auth-service
+    startCommand: ./bin/auth
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DATABASE
+        value: zodiac_ai
+      - key: JWT_SECRET
+        sync: false
+      - key: AUTH_SERVICE_PORT
+        value: 8001
+
+  # Chat Service
+  - type: web
+    name: zodiac-chat-service
+    env: go
+    buildCommand: go build -o bin/chat ./services/chat-service
+    startCommand: ./bin/chat
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DATABASE
+        value: zodiac_ai
+      - key: AI_SERVICE_URL
+        value: https://zodiac-ai-service.onrender.com
+      - key: CHAT_SERVICE_PORT
+        value: 8002
+
+  # Social Service
+  - type: web
+    name: zodiac-social-service
+    env: go
+    buildCommand: go build -o bin/social ./services/social-service
+    startCommand: ./bin/social
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: MONGODB_DATABASE
+        value: zodiac_ai
+      - key: SOCIAL_SERVICE_PORT
+        value: 8003
+
+  # AI Service
+  - type: web
+    name: zodiac-ai-service
+    env: go
+    buildCommand: go build -o bin/ai ./services/ai-service
+    startCommand: ./bin/ai
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: AI_SERVICE_PORT
+        value: 8004

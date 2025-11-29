@@ -1,0 +1,134 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: zodiac-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: zodiac_ai
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - zodiac-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: zodiac-api-gateway
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017
+      - AUTH_SERVICE_URL=http://auth-service:8001
+      - CHAT_SERVICE_URL=http://chat-service:8002
+      - SOCIAL_SERVICE_URL=http://social-service:8003
+      - AI_SERVICE_URL=http://ai-service:8004
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      chat-service:
+        condition: service_started
+      social-service:
+        condition: service_started
+      ai-service:
+        condition: service_started
+    networks:
+      - zodiac-network
+
+  # Auth Service
+  auth-service:
+    build:
+      context: .
+      dockerfile: services/auth-service/Dockerfile
+    container_name: zodiac-auth-service
+    restart: unless-stopped
+    ports:
+      - "8001:8001"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017
+      - MONGODB_DATABASE=zodiac_ai
+      - JWT_SECRET=${JWT_SECRET}
+      - AUTH_SERVICE_PORT=8001
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - zodiac-network
+
+  # Chat Service
+  chat-service:
+    build:
+      context: .
+      dockerfile: services/chat-service/Dockerfile
+    container_name: zodiac-chat-service
+    restart: unless-stopped
+    ports:
+      - "8002:8002"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017
+      - MONGODB_DATABASE=zodiac_ai
+      - AI_SERVICE_URL=http://ai-service:8004
+      - CHAT_SERVICE_PORT=8002
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      ai-service:
+        condition: service_started
+    networks:
+      - zodiac-network
+
+  # Social Service
+  social-service:
+    build:
+      context: .
+      dockerfile: services/social-service/Dockerfile
+    container_name: zodiac-social-service
+    restart: unless-stopped
+    ports:
+      - "8003:8003"
+    environment:
+      - MONGODB_URI=mongodb://mongodb:27017
+      - MONGODB_DATABASE=zodiac_ai
+      - SOCIAL_SERVICE_PORT=8003
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - zodiac-network
+
+  # AI Service
+  ai-service:
+    build:
+      context: .
+      dockerfile: services/ai-service/Dockerfile
+    container_name: zodiac-ai-service
+    restart: unless-stopped
+    ports:
+      - "8004:8004"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - AI_SERVICE_PORT=8004
+    networks:
+      - zodiac-network
+
+networks:
+  zodiac-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local
