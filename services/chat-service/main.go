@@ -19,7 +19,7 @@ import (
 	"zodiac-ai-backend/services/chat-service/websocket"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/websocket/v2"
+	fiberws "github.com/gofiber/websocket/v2"
 )
 
 func main() {
@@ -112,7 +112,7 @@ func main() {
 
 	// WebSocket route
 	// Note: Middleware is applied inside the handler for WebSocket upgrade
-	app.Get("/rooms/:id/ws", websocket.New(roomHandler.JoinRoom))
+	app.Get("/rooms/:id/ws", fiberws.New(roomHandler.JoinRoom))
 
 	// Start server
 	port := cfg.ChatServicePort
