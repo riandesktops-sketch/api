@@ -16,8 +16,10 @@ import (
 	"zodiac-ai-backend/services/chat-service/handlers"
 	"zodiac-ai-backend/services/chat-service/repositories"
 	"zodiac-ai-backend/services/chat-service/services"
+	"zodiac-ai-backend/services/chat-service/websocket"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/websocket/v2"
 )
 
 func main() {
@@ -46,12 +48,18 @@ func main() {
 	// Initialize repositories
 	sessionRepo := repositories.NewChatSessionRepository(db)
 	messageRepo := repositories.NewMessageRepository(db)
+	roomRepo := repositories.NewRoomRepository(db)
 
 	// Initialize services
 	chatService := services.NewChatService(sessionRepo, messageRepo, cfg.AIServiceURL)
 
+	// Initialize WebSocket Hub
+	hub := websocket.NewHub()
+	go hub.Run()
+
 	// Initialize handlers
 	chatHandler := handlers.NewChatHandler(chatService)
+	roomHandler := handlers.NewRoomHandler(roomRepo, hub)
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
@@ -95,6 +103,16 @@ func main() {
 	chat.Post("/sessions/:id/messages", chatHandler.SendMessage)
 	chat.Get("/sessions/:id/messages", chatHandler.GetMessages)
 	chat.Post("/sessions/:id/generate-insight", chatHandler.GenerateInsight)
+
+	// Room routes
+	rooms := api.Group("/rooms")
+	rooms.Use(middleware.AuthMiddleware(jwtManager))
+	rooms.Post("", roomHandler.CreateRoom)
+	rooms.Get("", roomHandler.GetRooms)
+
+	// WebSocket route
+	// Note: Middleware is applied inside the handler for WebSocket upgrade
+	app.Get("/rooms/:id/ws", websocket.New(roomHandler.JoinRoom))
 
 	// Start server
 	port := cfg.ChatServicePort

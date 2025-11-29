@@ -56,8 +56,18 @@ func (s *AuthService) Register(ctx context.Context, req *models.RegisterRequest)
 		return nil, err
 	}
 
+	// Parse date of birth
+	dateOfBirth, err := time.Parse(time.RFC3339, req.DateOfBirth)
+	if err != nil {
+		// Try parsing without time if RFC3339 fails (fallback)
+		dateOfBirth, err = time.Parse("2006-01-02", req.DateOfBirth)
+		if err != nil {
+			return nil, errors.New("invalid date format, expected ISO8601 or YYYY-MM-DD")
+		}
+	}
+
 	// Calculate zodiac sign from date of birth
-	zodiacSign := utils.CalculateZodiac(req.DateOfBirth)
+	zodiacSign := utils.CalculateZodiac(dateOfBirth)
 
 	// Hash password
 	hashedPassword, err := utils.HashPassword(req.Password)
@@ -71,7 +81,7 @@ func (s *AuthService) Register(ctx context.Context, req *models.RegisterRequest)
 		Password:    hashedPassword,
 		FullName:    req.FullName,
 		DisplayName: req.FullName, // Default to full name
-		DateOfBirth: req.DateOfBirth,
+		DateOfBirth: dateOfBirth,
 		Gender:      req.Gender,
 		ZodiacSign:  string(zodiacSign),
 	}

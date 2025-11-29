@@ -42,6 +42,12 @@ func main() {
 	// Load configuration
 	cfg := config.LoadConfig()
 
+	// Determine port (needed for internal service communication)
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
 	// Connect to MongoDB
 	_, err := database.Connect(database.MongoConfig{
 		URI:      cfg.MongoURI,
@@ -90,10 +96,10 @@ func main() {
 	roomRepo := chatRepos.NewRoomRepository(db)
 
 	// AI service URL is internal (same app) - use direct handler call instead of HTTP
-	// For simplicity, we'll keep HTTP but use localhost
+	// For simplicity, we'll keep HTTP but use localhost with the correct port
 	aiServiceURL := os.Getenv("AI_SERVICE_URL")
 	if aiServiceURL == "" {
-		aiServiceURL = "http://localhost:8080"
+		aiServiceURL = "http://localhost:" + port
 	}
 	chatService := chatServices.NewChatService(sessionRepo, messageRepo, aiServiceURL)
 
@@ -213,10 +219,7 @@ func main() {
 	ai.Post("/insight", aiHandler.GenerateInsight)
 
 	// Start server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
+	// Port is already determined at the top
 
 	log.Printf("🚀 Zodiac AI All-in-One starting on port %s", port)
 	log.Printf("📡 All services running in single application")

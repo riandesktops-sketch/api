@@ -34,7 +34,10 @@ func (h *AuthHandler) Register(c *fiber.Ctx) error {
 		if err == services.ErrEmailAlreadyExists {
 			return response.Conflict(c, "Email already exists")
 		}
-		return response.InternalServerError(c, "Failed to register user")
+		// Log the actual error for debugging
+		// In a real app, use a proper logger
+		println("Registration error:", err.Error())
+		return response.InternalServerError(c, "Failed to register user: "+err.Error())
 	}
 
 	return response.Created(c, "User registered successfully", authResp)

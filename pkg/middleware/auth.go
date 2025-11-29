@@ -12,19 +12,24 @@ import (
 // Verifies JWT token and injects user context
 func AuthMiddleware(jwtManager *jwt.Manager) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		// Extract token from Authorization header
+		// Extract token from Authorization header or query param (for WebSocket)
 		authHeader := c.Get("Authorization")
-		if authHeader == "" {
-			return response.Unauthorized(c, "Missing authorization header")
-		}
+		var tokenString string
 
-		// Check Bearer prefix
-		parts := strings.Split(authHeader, " ")
-		if len(parts) != 2 || parts[0] != "Bearer" {
-			return response.Unauthorized(c, "Invalid authorization header format")
+		if authHeader != "" {
+			// Check Bearer prefix
+			parts := strings.Split(authHeader, " ")
+			if len(parts) != 2 || parts[0] != "Bearer" {
+				return response.Unauthorized(c, "Invalid authorization header format")
+			}
+			tokenString = parts[1]
+		} else {
+			// Try to get token from query param (for WebSocket)
+			tokenString = c.Query("token")
+			if tokenString == "" {
+				return response.Unauthorized(c, "Missing authorization header or token")
+			}
 		}
-
-		tokenString := parts[1]
 
 		// Verify token
 		claims, err := jwtManager.VerifyToken(tokenString)
