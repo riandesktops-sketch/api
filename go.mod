@@ -9,7 +9,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/joho/godotenv v1.5.1
 	go.mongodb.org/mongo-driver v1.17.6
-	golang.org/x/crypto v0.17.0
+	golang.org/x/crypto v0.45.0
 	google.golang.org/genai v1.36.0
 )
 
