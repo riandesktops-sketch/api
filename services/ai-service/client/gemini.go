@@ -25,16 +25,19 @@ type GeminiClient struct {
 }
 
 // NewGeminiClient creates a new Gemini AI client
+// The API key is automatically read from GEMINI_API_KEY environment variable
 func NewGeminiClient(apiKey string) (*GeminiClient, error) {
 	ctx := context.Background()
 	
-	// Create Gemini client with API key
-	client, err := genai.NewClient(ctx, &genai.ClientConfig{
-		APIKey: apiKey,
-	})
+	// Create Gemini client - it will automatically use GEMINI_API_KEY env var
+	// Note: apiKey parameter is kept for backward compatibility but not used
+	// Make sure GEMINI_API_KEY is set in your environment
+	client, err := genai.NewClient(ctx, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
+
+	log.Printf("✅ Gemini client initialized (using GEMINI_API_KEY env var)")
 
 	return &GeminiClient{
 		client:     client,
