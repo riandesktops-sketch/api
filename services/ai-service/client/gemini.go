@@ -28,8 +28,10 @@ type GeminiClient struct {
 func NewGeminiClient(apiKey string) (*GeminiClient, error) {
 	ctx := context.Background()
 	
-	// Create Gemini client (API key from environment)
-	client, err := genai.NewClient(ctx, nil)
+	// Create Gemini client with API key
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{
+		APIKey: apiKey,
+	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
@@ -90,10 +92,13 @@ func (c *GeminiClient) GenerateChatResponse(ctx context.Context, zodiacSign, use
 	
 	response, err := c.GenerateContent(ctx, prompt)
 	if err != nil {
+		// Log the error for debugging
+		log.Printf("⚠️ Gemini API failed, using fallback. Error: %v", err)
 		// Fallback response if AI fails
 		return c.getFallbackChatResponse(zodiacSign), nil
 	}
 	
+	log.Printf("✅ Gemini API success for zodiac: %s", zodiacSign)
 	return response, nil
 }
 
