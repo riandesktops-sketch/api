@@ -190,6 +190,7 @@ func main() {
 	rooms.Use(rateLimiter.RateLimitMiddleware())
 	rooms.Post("", roomHandler.CreateRoom)
 	rooms.Get("", roomHandler.GetRooms)
+	rooms.Delete("/:id", roomHandler.DeleteRoom)
 
 	// WebSocket route
 	app.Get("/api/v1/rooms/:id/ws", ws.New(func(c *ws.Conn) {
