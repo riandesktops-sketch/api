@@ -107,3 +107,41 @@ func (h *RoomHandler) JoinRoom(c *ws.Conn) {
 	go client.WritePump()
 	client.ReadPump()
 }
+
+// DeleteRoom deletes a room
+// DELETE /rooms/:id
+func (h *RoomHandler) DeleteRoom(c *fiber.Ctx) error {
+	userID := middleware.GetUserID(c)
+	if userID == "" {
+		return response.Unauthorized(c, "User not authenticated")
+	}
+
+	roomID := c.Params("id")
+	if roomID == "" {
+		return response.BadRequest(c, "Room ID is required", nil)
+	}
+
+	roomObjID, err := primitive.ObjectIDFromHex(roomID)
+	if err != nil {
+		return response.BadRequest(c, "Invalid room ID", nil)
+	}
+
+	// Check if room exists and user is the creator
+	room, err := h.roomRepo.FindByID(c.Context(), roomObjID)
+	if err != nil {
+		return response.NotFound(c, "Room not found")
+	}
+
+	userObjID, _ := primitive.ObjectIDFromHex(userID)
+	if room.CreatorID != userObjID {
+		return response.Forbidden(c, "Only room creator can delete the room")
+	}
+
+	// Delete the room
+	if err := h.roomRepo.Delete(c.Context(), roomObjID); err != nil {
+		return response.InternalServerError(c, "Failed to delete room")
+	}
+
+	return response.Success(c, "Room deleted successfully", nil)
+}
+

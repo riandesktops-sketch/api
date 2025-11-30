@@ -114,15 +114,20 @@ func (c *GeminiClient) GenerateInsight(ctx context.Context, chatHistory string) 
 func (c *GeminiClient) buildChatPrompt(zodiacSign, userMessage string) string {
 	traits := getZodiacTraits(zodiacSign)
 	
-	return fmt.Sprintf(`You are a %s AI companion with these personality traits: %s.
+	return fmt.Sprintf(`Kamu adalah AI companion yang ramah dan bisa diajak ngobrol santai.
+Kamu punya sedikit karakteristik zodiak %s (%s), tapi jangan terlalu berlebihan atau alay.
 
-Respond to the user's message with empathy, wisdom, and understanding characteristic of %s.
-Be supportive, insightful, and help them reflect on their feelings.
+Respon dengan natural seperti teman yang ngobrol biasa:
+- Jangan terlalu formal atau kaku
+- Jangan terlalu dramatis atau puitis
+- Fokus pada apa yang user tanyakan/ceritakan
+- Kasih respon yang relevan dengan pesan mereka
+- Boleh santai tapi tetap supportive
 
-User message: %s
+Pesan user: %s
 
-Respond in a warm, compassionate tone (max 150 words). Speak in Bahasa Indonesia.`, 
-		zodiacSign, traits, zodiacSign, userMessage)
+Respon dalam bahasa Indonesia yang natural dan casual (max 100 kata).`, 
+		zodiacSign, traits, userMessage)
 }
 
 // buildInsightPrompt builds prompt for insight generation
@@ -146,25 +151,25 @@ Format: A single paragraph of wisdom in Bahasa Indonesia. Make it profound and s
 // getFallbackChatResponse returns fallback response if AI fails
 func (c *GeminiClient) getFallbackChatResponse(zodiacSign string) string {
 	fallbacks := map[string]string{
-		"Aries":       "Saya mendengarkan Anda. Keberanian Anda untuk berbagi ini menunjukkan kekuatan sejati. Teruslah maju dengan percaya diri.",
-		"Taurus":      "Terima kasih telah berbagi. Kesabaran dan keteguhan Anda akan membawa Anda melewati ini. Percayalah pada prosesnya.",
-		"Gemini":      "Saya memahami perspektif Anda. Kemampuan adaptasi Anda adalah kekuatan. Teruslah terbuka terhadap kemungkinan baru.",
-		"Cancer":      "Perasaan Anda valid dan penting. Intuisi Anda membimbing Anda dengan baik. Percayalah pada diri sendiri.",
-		"Leo":         "Saya menghargai keterbukaan Anda. Kekuatan dan kreativitas Anda akan membantu Anda menemukan jalan. Tetaplah bersinar.",
-		"Virgo":       "Terima kasih atas kepercayaan Anda. Analisis dan dedikasi Anda akan membawa kejelasan. Teruslah berusaha.",
-		"Libra":       "Saya mendengarkan dengan penuh perhatian. Keseimbangan dan kebijaksanaan Anda akan membantu menemukan harmoni. Tetaplah adil pada diri sendiri.",
-		"Scorpio":     "Keberanian Anda untuk menghadapi ini menginspirasi. Kekuatan batin Anda luar biasa. Percayalah pada transformasi.",
-		"Sagittarius": "Optimisme Anda adalah hadiah. Teruslah mencari makna dan pertumbuhan. Petualangan ini akan mengajarkan banyak hal.",
-		"Capricorn":   "Disiplin dan tanggung jawab Anda patut dihormati. Teruslah bergerak maju dengan tujuan yang jelas. Anda akan berhasil.",
-		"Aquarius":    "Perspektif unik Anda berharga. Teruslah berinovasi dan berpikir bebas. Perubahan dimulai dari dalam.",
-		"Pisces":      "Empati dan kreativitas Anda adalah kekuatan. Percayalah pada intuisi artistik Anda. Anda tidak sendirian.",
+		"Aries":       "Halo! Maaf nih, lagi ada gangguan sebentar. Tapi aku di sini kok, siap dengerin kamu.",
+		"Taurus":      "Hai! Ada yang bisa aku bantu? Cerita aja, aku dengerin.",
+		"Gemini":      "Halo! Gimana kabarnya? Ada yang mau diobrolin?",
+		"Cancer":      "Hai! Aku di sini kalau kamu mau cerita atau butuh temen ngobrol.",
+		"Leo":         "Halo! Ada yang bisa aku bantu hari ini?",
+		"Virgo":       "Hai! Cerita aja kalau ada yang mau dibahas, aku siap dengerin.",
+		"Libra":       "Halo! Gimana hari ini? Ada yang mau diceritain?",
+		"Scorpio":     "Hai! Aku di sini kalau kamu butuh temen ngobrol.",
+		"Sagittarius": "Halo! Ada yang mau dibahas? Cerita aja santai.",
+		"Capricorn":   "Hai! Gimana kabarnya? Aku siap dengerin kalau ada yang mau diceritain.",
+		"Aquarius":    "Halo! Ada yang bisa aku bantu? Ngobrol aja santai.",
+		"Pisces":      "Hai! Aku di sini kalau kamu butuh temen cerita.",
 	}
 	
 	if response, ok := fallbacks[zodiacSign]; ok {
 		return response
 	}
 	
-	return "Saya mendengarkan Anda. Terima kasih telah berbagi perasaan Anda. Anda berani dan kuat."
+	return "Halo! Ada yang bisa aku bantu? Cerita aja santai."
 }
 
 // getFallbackInsight returns fallback insight if AI fails

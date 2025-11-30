@@ -109,9 +109,9 @@ func main() {
 	rooms.Use(middleware.AuthMiddleware(jwtManager))
 	rooms.Post("", roomHandler.CreateRoom)
 	rooms.Get("", roomHandler.GetRooms)
+	rooms.Delete("/:id", roomHandler.DeleteRoom)
 
-	// WebSocket route
-	// Note: Middleware is applied inside the handler for WebSocket upgrade
+	// WebSocket route for room chat (auth via query param)
 	app.Get("/rooms/:id/ws", fiberws.New(roomHandler.JoinRoom))
 
 	// Start server

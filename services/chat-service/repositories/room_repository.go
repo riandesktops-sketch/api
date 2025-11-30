@@ -112,3 +112,17 @@ func (r *RoomRepository) IncrementMemberCount(ctx context.Context, roomID primit
 	)
 	return err
 }
+
+// Delete deletes a room and all its messages
+func (r *RoomRepository) Delete(ctx context.Context, roomID primitive.ObjectID) error {
+	// Delete all messages in the room first
+	_, err := r.messageCollection.DeleteMany(ctx, bson.M{"room_id": roomID})
+	if err != nil {
+		return err
+	}
+
+	// Delete the room
+	_, err = r.collection.DeleteOne(ctx, bson.M{"_id": roomID})
+	return err
+}
+
