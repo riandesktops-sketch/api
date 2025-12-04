@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -200,6 +201,8 @@ func (s *ChatService) GetUserSessions(ctx context.Context, userID string) ([]*mo
 
 // callAIService calls AI service to get chat response
 func (s *ChatService) callAIService(ctx context.Context, zodiacSign, userMessage string) (string, error) {
+	log.Printf("📞 Calling AI service at %s with zodiac: %s", s.aiServiceURL, zodiacSign)
+	
 	reqBody := map[string]string{
 		"zodiac_sign":  zodiacSign,
 		"user_message": userMessage,
@@ -207,11 +210,13 @@ func (s *ChatService) callAIService(ctx context.Context, zodiacSign, userMessage
 
 	jsonData, err := json.Marshal(reqBody)
 	if err != nil {
+		log.Printf("❌ Failed to marshal request: %v", err)
 		return "", err
 	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", s.aiServiceURL+"/api/v1/ai/chat", strings.NewReader(string(jsonData)))
 	if err != nil {
+		log.Printf("❌ Failed to create request: %v", err)
 		return "", err
 	}
 
@@ -220,18 +225,24 @@ func (s *ChatService) callAIService(ctx context.Context, zodiacSign, userMessage
 	client := &http.Client{Timeout: 35 * time.Second}
 	resp, err := client.Do(req)
 	if err != nil {
+		log.Printf("❌ AI service request failed: %v", err)
 		return "", ErrAIServiceDown
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("❌ AI service returned status %d: %s", resp.StatusCode, string(body))
 		return "", ErrAIServiceDown
 	}
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
+		log.Printf("❌ Failed to read response body: %v", err)
 		return "", err
 	}
+
+	log.Printf("📥 AI service response: %s", string(body))
 
 	var result struct {
 		Success bool `json:"success"`
@@ -241,13 +252,16 @@ func (s *ChatService) callAIService(ctx context.Context, zodiacSign, userMessage
 	}
 
 	if err := json.Unmarshal(body, &result); err != nil {
+		log.Printf("❌ Failed to unmarshal response: %v", err)
 		return "", err
 	}
 
 	if !result.Success {
+		log.Printf("❌ AI service returned success=false")
 		return "", ErrAIServiceDown
 	}
 
+	log.Printf("✅ AI response received: %.100s...", result.Data.Response)
 	return result.Data.Response, nil
 }
 

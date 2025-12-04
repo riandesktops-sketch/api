@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"log"
+	
 	"zodiac-ai-backend/pkg/response"
 	"zodiac-ai-backend/services/ai-service/client"
 
@@ -31,15 +33,19 @@ func (h *AIHandler) GenerateChatResponse(c *fiber.Ctx) error {
 		return response.BadRequest(c, "Invalid request body", nil)
 	}
 
+	log.Printf("🎯 AI Handler received request - Zodiac: %s, Message: %.50s...", req.ZodiacSign, req.UserMessage)
+
 	aiResponse, err := h.geminiClient.GenerateChatResponse(
 		c.Context(),
 		req.ZodiacSign,
 		req.UserMessage,
 	)
 	if err != nil {
+		log.Printf("❌ AI Handler failed to generate response: %v", err)
 		return response.InternalServerError(c, "Failed to generate AI response")
 	}
 
+	log.Printf("✅ AI Handler returning response: %.100s...", aiResponse)
 	return response.Success(c, "AI response generated", fiber.Map{
 		"response": aiResponse,
 	})

@@ -41,7 +41,7 @@ func NewGeminiClient(apiKey string) (*GeminiClient, error) {
 
 	return &GeminiClient{
 		client:     client,
-		model:      "gemini-2.0-flash-exp",
+		model:      "gemini-1.5-flash",
 		maxRetries: 3,
 		baseDelay:  time.Second,
 	}, nil
@@ -91,6 +91,19 @@ func (c *GeminiClient) GenerateContent(ctx context.Context, prompt string) (stri
 
 // GenerateChatResponse generates AI chat response with zodiac persona
 func (c *GeminiClient) GenerateChatResponse(ctx context.Context, zodiacSign, userMessage string) (string, error) {
+	// Validate zodiac sign
+	if zodiacSign == "" {
+		log.Printf("⚠️ Empty zodiac sign, using default")
+		zodiacSign = "Gemini" // Default fallback
+	}
+	
+	// Validate user message
+	if userMessage == "" {
+		return "", ErrInvalidPrompt
+	}
+	
+	log.Printf("🤖 Generating AI response for zodiac: %s, message: %.50s...", zodiacSign, userMessage)
+	
 	prompt := c.buildChatPrompt(zodiacSign, userMessage)
 	
 	response, err := c.GenerateContent(ctx, prompt)
