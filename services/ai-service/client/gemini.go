@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"google.golang.org/genai"
@@ -29,19 +30,31 @@ type GeminiClient struct {
 func NewGeminiClient(apiKey string) (*GeminiClient, error) {
 	ctx := context.Background()
 	
+	// Check if GEMINI_API_KEY is set in environment
+	envKey := os.Getenv("GEMINI_API_KEY")
+	if envKey == "" {
+		log.Printf("❌❌❌ WARNING: GEMINI_API_KEY environment variable is NOT set! ❌❌❌")
+		log.Printf("⚠️ AI responses will use fallback messages only")
+		log.Printf("💡 Set GEMINI_API_KEY in your environment to enable real AI responses")
+	} else {
+		log.Printf("✅ GEMINI_API_KEY found in environment (length: %d chars)", len(envKey))
+	}
+	
 	// Create Gemini client - it will automatically use GEMINI_API_KEY env var
 	// Note: apiKey parameter is kept for backward compatibility but not used
 	// Make sure GEMINI_API_KEY is set in your environment
 	client, err := genai.NewClient(ctx, nil)
 	if err != nil {
+		log.Printf("❌ Failed to create Gemini client: %v", err)
 		return nil, fmt.Errorf("failed to create Gemini client: %w", err)
 	}
 
-	log.Printf("✅ Gemini client initialized (using GEMINI_API_KEY env var)")
+	log.Printf("✅ Gemini client initialized successfully")
+	log.Printf("📋 Using model: gemini-2.5-flash")
 
 	return &GeminiClient{
 		client:     client,
-		model:      "gemini-1.5-flash",
+		model:      "gemini-2.5-flash",
 		maxRetries: 3,
 		baseDelay:  time.Second,
 	}, nil
@@ -99,6 +112,7 @@ func (c *GeminiClient) GenerateChatResponse(ctx context.Context, zodiacSign, use
 	
 	// Validate user message
 	if userMessage == "" {
+		log.Printf("❌ Empty user message received")
 		return "", ErrInvalidPrompt
 	}
 	
@@ -108,13 +122,19 @@ func (c *GeminiClient) GenerateChatResponse(ctx context.Context, zodiacSign, use
 	
 	response, err := c.GenerateContent(ctx, prompt)
 	if err != nil {
-		// Log the error for debugging
-		log.Printf("⚠️ Gemini API failed, using fallback. Error: %v", err)
+		// Log the error for debugging with more details
+		if err == ErrAIUnavailable {
+			log.Printf("❌❌❌ GEMINI API UNAVAILABLE - Check if GEMINI_API_KEY is set correctly! ❌❌❌")
+			log.Printf("⚠️ Using fallback response for zodiac: %s", zodiacSign)
+		} else {
+			log.Printf("⚠️ Gemini API failed with error: %v", err)
+			log.Printf("⚠️ Using fallback response for zodiac: %s", zodiacSign)
+		}
 		// Fallback response if AI fails
 		return c.getFallbackChatResponse(zodiacSign), nil
 	}
 	
-	log.Printf("✅ Gemini API success for zodiac: %s", zodiacSign)
+	log.Printf("✅ Gemini API success for zodiac: %s, response length: %d chars", zodiacSign, len(response))
 	return response, nil
 }
 
