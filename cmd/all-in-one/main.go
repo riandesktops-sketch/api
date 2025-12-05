@@ -13,6 +13,7 @@ import (
 	"zodiac-ai-backend/pkg/database"
 	"zodiac-ai-backend/pkg/jwt"
 	"zodiac-ai-backend/pkg/middleware"
+	"zodiac-ai-backend/pkg/queue"
 
 	// Auth
 	authHandlers "zodiac-ai-backend/services/auth-service/handlers"
@@ -88,7 +89,32 @@ func main() {
 	}
 	defer geminiClient.Close()
 
-	aiHandler := aiHandlers.NewAIHandler(geminiClient)
+	// Initialize request queue for AI service
+	aiRequestQueue := queue.NewRequestQueue(queue.Config{
+		QueueSize: 1000, // Buffer for 1000 requests
+		Workers:   10,   // 10 concurrent workers
+		Processor: func(ctx context.Context, data interface{}) (interface{}, error) {
+			// Extract request data
+			reqData := data.(map[string]interface{})
+			zodiacSign := reqData["zodiac_sign"].(string)
+			userMessage := reqData["user_message"].(string)
+
+			// Generate AI response
+			response, err := geminiClient.GenerateChatResponse(ctx, zodiacSign, userMessage)
+			return response, err
+		},
+	})
+
+	// Start queue workers
+	aiRequestQueue.Start()
+	defer func() {
+		log.Println("🛑 Stopping AI request queue...")
+		if err := aiRequestQueue.Stop(30 * time.Second); err != nil {
+			log.Printf("⚠️ Error stopping AI queue: %v", err)
+		}
+	}()
+
+	aiHandler := aiHandlers.NewAIHandler(geminiClient, aiRequestQueue)
 
 	// ========== CHAT SERVICE ==========
 	sessionRepo := chatRepos.NewChatSessionRepository(db)
@@ -144,8 +170,9 @@ func main() {
 		}
 
 		return c.JSON(fiber.Map{
-			"status":  "healthy",
-			"service": "zodiac-ai-all-in-one",
+			"status":   "healthy",
+			"service":  "zodiac-ai-all-in-one",
+			"ai_queue": aiRequestQueue.Stats(),
 		})
 	})
 
