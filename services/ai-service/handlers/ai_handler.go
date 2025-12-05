@@ -1,27 +1,33 @@
 package handlers
 
 import (
+	"context"
 	"log"
+	"time"
 	
+	"zodiac-ai-backend/pkg/queue"
 	"zodiac-ai-backend/pkg/response"
 	"zodiac-ai-backend/services/ai-service/client"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/google/uuid"
 )
 
 // AIHandler handles AI-related HTTP requests
 type AIHandler struct {
 	geminiClient *client.GeminiClient
+	requestQueue *queue.RequestQueue
 }
 
 // NewAIHandler creates a new AI handler
-func NewAIHandler(geminiClient *client.GeminiClient) *AIHandler {
+func NewAIHandler(geminiClient *client.GeminiClient, requestQueue *queue.RequestQueue) *AIHandler {
 	return &AIHandler{
 		geminiClient: geminiClient,
+		requestQueue: requestQueue,
 	}
 }
 
-// GenerateChatResponse generates AI chat response
+// GenerateChatResponse generates AI chat response using request queue
 // POST /ai/chat
 func (h *AIHandler) GenerateChatResponse(c *fiber.Ctx) error {
 	var req struct {
@@ -35,20 +41,75 @@ func (h *AIHandler) GenerateChatResponse(c *fiber.Ctx) error {
 
 	log.Printf("🎯 AI Handler received request - Zodiac: %s, Message: %.50s...", req.ZodiacSign, req.UserMessage)
 
-	aiResponse, err := h.geminiClient.GenerateChatResponse(
-		c.Context(),
-		req.ZodiacSign,
-		req.UserMessage,
-	)
-	if err != nil {
-		log.Printf("❌ AI Handler failed to generate response: %v", err)
-		return response.InternalServerError(c, "Failed to generate AI response")
+	// Create request ID
+	requestID := uuid.New().String()
+
+	// Create request data
+	requestData := map[string]interface{}{
+		"zodiac_sign":  req.ZodiacSign,
+		"user_message": req.UserMessage,
 	}
 
-	log.Printf("✅ AI Handler returning response: %.100s...", aiResponse)
-	return response.Success(c, "AI response generated", fiber.Map{
-		"response": aiResponse,
-	})
+	// Create result channel
+	resultChan := make(chan queue.Result, 1)
+
+	// Create queue request
+	queueReq := &queue.Request{
+		ID:        requestID,
+		Data:      requestData,
+		Context:   c.Context(),
+		Result:    resultChan,
+		EnqueueAt: time.Now(),
+	}
+
+	// Enqueue request
+	if err := h.requestQueue.Enqueue(queueReq); err != nil {
+		if err == queue.ErrQueueFull {
+			log.Printf("❌ Queue full - rejecting request %s", requestID)
+			return c.Status(fiber.StatusTooManyRequests).JSON(fiber.Map{
+				"success": false,
+				"message": "Server is busy, please try again later",
+			})
+		}
+		log.Printf("❌ Failed to enqueue request %s: %v", requestID, err)
+		return response.InternalServerError(c, "Failed to process request")
+	}
+
+	log.Printf("📥 Request %s enqueued, waiting for result...", requestID)
+
+	// Wait for result with timeout (60 seconds)
+	ctx, cancel := context.WithTimeout(c.Context(), 60*time.Second)
+	defer cancel()
+
+	select {
+	case result := <-resultChan:
+		if result.Error != nil {
+			log.Printf("❌ Request %s failed: %v", requestID, result.Error)
+			
+			// Check if it's a fallback response (still return success)
+			if aiResponse, ok := result.Data.(string); ok && aiResponse != "" {
+				log.Printf("✅ Request %s returning fallback response", requestID)
+				return response.Success(c, "AI response generated (fallback)", fiber.Map{
+					"response": aiResponse,
+				})
+			}
+			
+			return response.InternalServerError(c, "Failed to generate AI response")
+		}
+
+		aiResponse := result.Data.(string)
+		log.Printf("✅ Request %s completed: %.100s...", requestID, aiResponse)
+		return response.Success(c, "AI response generated", fiber.Map{
+			"response": aiResponse,
+		})
+
+	case <-ctx.Done():
+		log.Printf("⏱️ Request %s timeout", requestID)
+		return c.Status(fiber.StatusRequestTimeout).JSON(fiber.Map{
+			"success": false,
+			"message": "Request timeout - please try again",
+		})
+	}
 }
 
 // GenerateInsight generates insight from chat history

@@ -8,6 +8,9 @@ import (
 	"os"
 	"time"
 
+	"zodiac-ai-backend/pkg/circuitbreaker"
+	"zodiac-ai-backend/pkg/ratelimiter"
+
 	"google.golang.org/genai"
 )
 
@@ -17,12 +20,14 @@ var (
 )
 
 // GeminiClient handles Gemini AI interactions
-// Implements retry strategy with exponential backoff
+// Implements retry strategy with exponential backoff, rate limiting, and circuit breaker
 type GeminiClient struct {
-	client      *genai.Client
-	model       string
-	maxRetries  int
-	baseDelay   time.Duration
+	client         *genai.Client
+	model          string
+	maxRetries     int
+	baseDelay      time.Duration
+	rateLimiter    *ratelimiter.RateLimiter
+	circuitBreaker *circuitbreaker.CircuitBreaker
 }
 
 // NewGeminiClient creates a new Gemini AI client
@@ -52,20 +57,47 @@ func NewGeminiClient(apiKey string) (*GeminiClient, error) {
 	log.Printf("✅ Gemini client initialized successfully")
 	log.Printf("📋 Using model: gemini-2.5-flash")
 
+	// Initialize rate limiter (10 requests per second)
+	rateLimiter := ratelimiter.NewRateLimiter(10, time.Second)
+	log.Printf("⚡ Rate limiter initialized: 10 req/s")
+
+	// Initialize circuit breaker (5 failures, 60s timeout)
+	circuitBreaker := circuitbreaker.NewCircuitBreaker(circuitbreaker.Config{
+		MaxFailures:     5,
+		ResetTimeout:    60 * time.Second,
+		HalfOpenMaxReqs: 1,
+	})
+	log.Printf("🔌 Circuit breaker initialized: 5 failures threshold, 60s timeout")
+
 	return &GeminiClient{
-		client:     client,
-		model:      "gemini-2.5-flash",
-		maxRetries: 3,
-		baseDelay:  time.Second,
+		client:         client,
+		model:          "gemini-2.5-flash",
+		maxRetries:     3,
+		baseDelay:      time.Second,
+		rateLimiter:    rateLimiter,
+		circuitBreaker: circuitBreaker,
 	}, nil
 }
 
-// GenerateContent generates content with retry strategy
+// GenerateContent generates content with retry strategy, rate limiting, and circuit breaker
 // Retry strategy: 3 attempts with exponential backoff (1s, 2s, 4s)
-// Reference: Pragmatic Programmer - Fail gracefully
+// Rate limiting: 10 requests per second
+// Circuit breaker: Opens after 5 consecutive failures
 func (c *GeminiClient) GenerateContent(ctx context.Context, prompt string) (string, error) {
 	if prompt == "" {
 		return "", ErrInvalidPrompt
+	}
+
+	// Check circuit breaker state
+	if c.circuitBreaker.IsOpen() {
+		log.Printf("⚠️ Circuit breaker is OPEN - failing fast")
+		return "", ErrAIUnavailable
+	}
+
+	// Wait for rate limiter
+	if err := c.rateLimiter.Wait(ctx); err != nil {
+		log.Printf("⚠️ Rate limiter wait cancelled: %v", err)
+		return "", err
 	}
 
 	var lastErr error
@@ -78,27 +110,43 @@ func (c *GeminiClient) GenerateContent(ctx context.Context, prompt string) (stri
 			time.Sleep(delay)
 		}
 
-		// Set timeout for this attempt
-		attemptCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
-		
-		result, err := c.client.Models.GenerateContent(
-			attemptCtx,
-			c.model,
-			genai.Text(prompt),
-			nil,
-		)
-		cancel()
+		// Execute with circuit breaker
+		var result *genai.GenerateContentResponse
+		err := c.circuitBreaker.Execute(func() error {
+			// Set timeout for this attempt
+			attemptCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
+			defer cancel()
+			
+			var apiErr error
+			result, apiErr = c.client.Models.GenerateContent(
+				attemptCtx,
+				c.model,
+				genai.Text(prompt),
+				nil,
+			)
+			return apiErr
+		})
 
-		if err == nil {
+		if err == nil && result != nil {
+			log.Printf("✅ Gemini API success (attempt %d, circuit: %s)", 
+				attempt+1, c.circuitBreaker.State())
 			return result.Text(), nil
 		}
 
 		lastErr = err
-		log.Printf("Gemini API error (attempt %d/%d): %v", attempt+1, c.maxRetries, err)
+		log.Printf("❌ Gemini API error (attempt %d/%d, circuit: %s): %v", 
+			attempt+1, c.maxRetries, c.circuitBreaker.State(), err)
+		
+		// If circuit is open, fail fast
+		if c.circuitBreaker.IsOpen() {
+			log.Printf("⚠️ Circuit breaker opened - stopping retries")
+			break
+		}
 	}
 
-	// All retries failed, return fallback
-	log.Printf("All Gemini API retries failed: %v", lastErr)
+	// All retries failed
+	log.Printf("❌ All Gemini API retries failed (circuit: %s): %v", 
+		c.circuitBreaker.State(), lastErr)
 	return "", ErrAIUnavailable
 }
 

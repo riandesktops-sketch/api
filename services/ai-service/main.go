@@ -11,6 +11,7 @@ import (
 
 	"zodiac-ai-backend/pkg/config"
 	"zodiac-ai-backend/pkg/middleware"
+	"zodiac-ai-backend/pkg/queue"
 	"zodiac-ai-backend/services/ai-service/client"
 	"zodiac-ai-backend/services/ai-service/handlers"
 
@@ -33,8 +34,33 @@ func main() {
 	}
 	defer geminiClient.Close()
 
+	// Initialize request queue with processor
+	requestQueue := queue.NewRequestQueue(queue.Config{
+		QueueSize: 1000, // Buffer for 1000 requests
+		Workers:   10,   // 10 concurrent workers
+		Processor: func(ctx context.Context, data interface{}) (interface{}, error) {
+			// Extract request data
+			reqData := data.(map[string]interface{})
+			zodiacSign := reqData["zodiac_sign"].(string)
+			userMessage := reqData["user_message"].(string)
+
+			// Generate AI response
+			response, err := geminiClient.GenerateChatResponse(ctx, zodiacSign, userMessage)
+			return response, err
+		},
+	})
+
+	// Start queue workers
+	requestQueue.Start()
+	defer func() {
+		log.Println("🛑 Stopping request queue...")
+		if err := requestQueue.Stop(30 * time.Second); err != nil {
+			log.Printf("⚠️ Error stopping queue: %v", err)
+		}
+	}()
+
 	// Initialize handlers
-	aiHandler := handlers.NewAIHandler(geminiClient)
+	aiHandler := handlers.NewAIHandler(geminiClient, requestQueue)
 
 	// Create Fiber app
 	app := fiber.New(fiber.Config{
@@ -50,9 +76,11 @@ func main() {
 
 	// Health check
 	app.Get("/health", func(c *fiber.Ctx) error {
+		stats := requestQueue.Stats()
 		return c.JSON(fiber.Map{
 			"status":  "healthy",
 			"service": "ai-service",
+			"queue":   stats,
 		})
 	})
 
@@ -67,6 +95,7 @@ func main() {
 	// Start server
 	port := cfg.AIServicePort
 	log.Printf("🚀 AI Service starting on port %s", port)
+	log.Printf("📊 Queue: %d buffer, %d workers", 1000, 10)
 
 	// Graceful shutdown
 	go func() {
